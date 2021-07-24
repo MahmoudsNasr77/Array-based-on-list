@@ -1,4 +1,5 @@
- public class List{
+import java.util.*;
+public class List{
  public static void main(String[] args) {
     Scanner s =new Scanner (System.in);
    ArrayList a1=new ArrayList(10);
@@ -109,5 +110,4 @@ class ArrayList{
     }
     
     
-}
 }
