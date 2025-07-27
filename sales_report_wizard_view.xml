@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sales Report Wizard Form View -->
+    <record id="view_report_sales_wizard_form" model="ir.ui.view">
+        <field name="name">report.sales.wizard.form</field>
+        <field name="model">report.sales.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Sales Report Generator">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="report_type" widget="radio" options="{'horizontal': true}"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Date Range">
+                            <field name="date_from" required="1"/>
+                            <field name="date_to" required="1"/>
+                        </group>
+                        <group string="Filters (Optional)">
+                            <field name="partner_ids" widget="many2many_tags" placeholder="Select customers..."/>
+                            <field name="product_ids" widget="many2many_tags" placeholder="Select products..."/>
+                        </group>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_generate_report" string="Generate Report" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Sales Report Wizard Action -->
+    <record id="action_sales_report_wizard" model="ir.actions.act_window">
+        <field name="name">Generate Sales Report</field>
+        <field name="res_model">report.sales.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="view_id" ref="view_report_sales_wizard_form"/>
+    </record>
+
+    <!-- Menu Item for Sales Report -->
+    <menuitem 
+        id="menu_sales_report_wizard"
+        name="Sales Reports"
+        parent="sale.sale_menu_root"
+        action="action_sales_report_wizard"
+        sequence="10"/>
+
+    <!-- Add Print Report button to Sale Order form -->
+    <record id="view_order_form_inherit_report" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.report</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_print_sales_report" 
+                        string="Print Sales Report" 
+                        type="object" 
+                        class="btn-secondary"
+                        states="sale,done"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Security Rules -->
+    <record id="access_report_sales_wizard" model="ir.model.access">
+        <field name="name">access.report.sales.wizard</field>
+        <field name="model_id" ref="model_report_sales_wizard"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="1"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="1"/>
+        <field name="group_id" ref="sales_team.group_sale_salesman"/>
+    </record>
+
+    <!-- Additional report action for direct access from list view -->
+    <record id="action_sale_order_reports" model="ir.actions.server">
+        <field name="name">Generate Sales Report</field>
+        <field name="model_id" ref="sale.model_sale_order"/>
+        <field name="binding_model_id" ref="sale.model_sale_order"/>
+        <field name="state">code</field>
+        <field name="code">
+if records:
+    action = {
+        'type': 'ir.actions.report',
+        'report_name': 'mg_account.report_sales_template_multi',
+        'report_type': 'qweb-html',
+        'docids': records.ids,
+        'context': env.context,
+    }
+        </field>
+    </record>
+</odoo>

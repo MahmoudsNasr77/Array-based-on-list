@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Sales Report Action -->
+    <record id="action_sales_report" model="ir.actions.report">
+        <field name="name">تقرير المبيعات</field>
+        <field name="model">sale.order</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">mg_account.report_sales_template</field>
+        <field name="binding_model_id" ref="sale.model_sale_order"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="base.paperformat_euro"/>
+    </record>
+
+    <!-- Report Template -->
+    <template id="report_sales_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page" dir="rtl">
+                        <!-- Custom CSS -->
+                        <style>
+                            @page {
+                                size: A4;
+                                margin: 15mm 10mm;
+                            }
+                            
+                            .o_report_layout_standard .article {
+                                direction: rtl;
+                                font-family: 'Arial', sans-serif;
+                            }
+                            
+                            .sales-report-table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                font-size: 12px;
+                                margin-top: 20px;
+                                direction: rtl;
+                            }
+                            
+                            .sales-report-table th,
+                            .sales-report-table td {
+                                border: 1px solid #333;
+                                padding: 8px 5px;
+                                text-align: center;
+                                vertical-align: middle;
+                            }
+                            
+                            .sales-report-table thead th {
+                                background-color: #f5f5f5;
+                                font-weight: bold;
+                                font-size: 11px;
+                            }
+                            
+                            .sales-report-table tbody tr:nth-child(even) {
+                                background-color: #f9f9f9;
+                            }
+                            
+                            .sales-report-table tbody tr:hover {
+                                background-color: #e6f3ff;
+                            }
+                            
+                            .report-title {
+                                text-align: center;
+                                margin-bottom: 30px;
+                                color: #2c3e50;
+                                font-size: 24px;
+                                font-weight: bold;
+                            }
+                            
+                            .currency-field {
+                                text-align: right;
+                                font-weight: bold;
+                            }
+                            
+                            .profit-positive {
+                                color: #27ae60;
+                                font-weight: bold;
+                            }
+                            
+                            .profit-negative {
+                                color: #e74c3c;
+                                font-weight: bold;
+                            }
+                        </style>
+
+                        <!-- Report Header -->
+                        <div class="report-title">
+                            <h1>تقرير المبيعات التفصيلي</h1>
+                            <p style="font-size: 14px; color: #7f8c8d; margin-top: 10px;">
+                                تاريخ التقرير: <span t-field="context_today" t-options="{'widget': 'date'}"/>
+                            </p>
+                        </div>
+
+                        <!-- Report Table -->
+                        <table class="sales-report-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30px;">#</th>
+                                    <th style="width: 80px;">التاريخ</th>
+                                    <th style="width: 60px;">الكمية</th>
+                                    <th style="width: 120px;">اسم المنتج</th>
+                                    <th style="width: 80px;">نوع المنتج</th>
+                                    <th style="width: 80px;">سعر الكلفة</th>
+                                    <th style="width: 80px;">سعر البيع</th>
+                                    <th style="width: 80px;">الربح</th>
+                                    <th style="width: 100px;">الموظف</th>
+                                    <th style="width: 100px;">من طرف</th>
+                                    <th style="width: 100px;">العميل</th>
+                                    <th style="width: 100px;">المورد</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="line_counter" t-value="1"/>
+                                <t t-set="total_profit" t-value="0.0"/>
+                                <t t-set="total_cost" t-value="0.0"/>
+                                <t t-set="total_sale" t-value="0.0"/>
+                                
+                                <t t-foreach="doc.order_line" t-as="order_line">
+                                    <t t-if="order_line.product_id">
+                                        <!-- Get corresponding purchase order line -->
+                                        <t t-set="po_line" t-value="None"/>
+                                        <t t-if="hasattr(doc, 'po_line_ids')">
+                                            <t t-foreach="doc.po_line_ids" t-as="po_line_item">
+                                                <t t-if="po_line_item.product_id.id == order_line.product_id.id">
+                                                    <t t-set="po_line" t-value="po_line_item"/>
+                                                </t>
+                                            </t>
+                                        </t>
+
+                                        <!-- Calculate values -->
+                                        <t t-set="cost_price" t-value="po_line.price_unit if po_line else order_line.product_id.standard_price"/>
+                                        <t t-set="sale_price" t-value="order_line.price_unit"/>
+                                        <t t-set="line_profit" t-value="(sale_price - cost_price) * order_line.product_uom_qty"/>
+                                        
+                                        <!-- Update totals -->
+                                        <t t-set="total_cost" t-value="total_cost + (cost_price * order_line.product_uom_qty)"/>
+                                        <t t-set="total_sale" t-value="total_sale + (sale_price * order_line.product_uom_qty)"/>
+                                        <t t-set="total_profit" t-value="total_profit + line_profit"/>
+
+                                        <tr>
+                                            <td t-esc="line_counter"/>
+                                            <td t-field="doc.date_order" t-options="{'widget': 'date'}"/>
+                                            <td t-esc="'%.2f' % order_line.product_uom_qty"/>
+                                            <td t-field="order_line.product_id.name" style="text-align: right;"/>
+                                            <td t-esc="dict(order_line.product_id._fields['type'].selection).get(order_line.product_id.type, '')"/>
+                                            <td class="currency-field" t-esc="'%.2f' % cost_price"/>
+                                            <td class="currency-field" t-esc="'%.2f' % sale_price"/>
+                                            <td t-att-class="'currency-field profit-positive' if line_profit >= 0 else 'currency-field profit-negative'" t-esc="'%.2f' % line_profit"/>
+                                            <td t-field="doc.partner_id.name"/>
+                                            <td t-field="doc.origin"/>
+                                            <td t-field="doc.user_id.name"/>
+                                            <td t-field="po_line.partner_id.name" t-if="po_line"/>
+                                        </tr>
+                                        <t t-set="line_counter" t-value="line_counter + 1"/>
+                                    </t>
+                                </t>
+                                
+                                <!-- Summary Row -->
+                                <tr style="background-color: #34495e; color: white; font-weight: bold;">
+                                    <td colspan="5" style="text-align: center;">المجموع الكلي</td>
+                                    <td class="currency-field" t-esc="'%.2f' % total_cost"/>
+                                    <td class="currency-field" t-esc="'%.2f' % total_sale"/>
+                                    <td t-att-class="'currency-field profit-positive' if total_profit >= 0 else 'currency-field profit-negative'" t-esc="'%.2f' % total_profit"/>
+                                    <td colspan="4"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Report Footer -->
+                        <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #7f8c8d;">
+                            <p>تم إنشاء هذا التقرير بواسطة نظام إدارة المبيعات</p>
+                            <p>الصفحة <span class="page"/> من <span class="topage"/></p>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- Report for Multiple Orders -->
+    <template id="report_sales_template_multi">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page" dir="rtl">
+                    <!-- Include the same CSS as above -->
+                    <style>
+                        @page {
+                            size: A4;
+                            margin: 15mm 10mm;
+                        }
+                        
+                        .o_report_layout_standard .article {
+                            direction: rtl;
+                            font-family: 'Arial', sans-serif;
+                        }
+                        
+                        .sales-report-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 11px;
+                            margin-top: 20px;
+                            direction: rtl;
+                        }
+                        
+                        .sales-report-table th,
+                        .sales-report-table td {
+                            border: 1px solid #333;
+                            padding: 6px 4px;
+                            text-align: center;
+                            vertical-align: middle;
+                        }
+                        
+                        .sales-report-table thead th {
+                            background-color: #f5f5f5;
+                            font-weight: bold;
+                            font-size: 10px;
+                        }
+                        
+                        .currency-field {
+                            text-align: right;
+                            font-weight: bold;
+                        }
+                        
+                        .profit-positive {
+                            color: #27ae60;
+                            font-weight: bold;
+                        }
+                        
+                        .profit-negative {
+                            color: #e74c3c;
+                            font-weight: bold;
+                        }
+                        
+                        .order-separator {
+                            background-color: #ecf0f1;
+                            font-weight: bold;
+                        }
+                    </style>
+
+                    <!-- Report Header -->
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #2c3e50; font-size: 24px;">تقرير المبيعات الموحد</h1>
+                        <p style="font-size: 14px; color: #7f8c8d; margin-top: 10px;">
+                            تاريخ التقرير: <span t-field="context_today" t-options="{'widget': 'date'}"/>
+                        </p>
+                    </div>
+
+                    <!-- Combined Report Table -->
+                    <table class="sales-report-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25px;">#</th>
+                                <th style="width: 70px;">رقم الطلب</th>
+                                <th style="width: 70px;">التاريخ</th>
+                                <th style="width: 50px;">الكمية</th>
+                                <th style="width: 100px;">اسم المنتج</th>
+                                <th style="width: 60px;">نوع المنتج</th>
+                                <th style="width: 70px;">سعر الكلفة</th>
+                                <th style="width: 70px;">سعر البيع</th>
+                                <th style="width: 70px;">الربح</th>
+                                <th style="width: 80px;">الموظف</th>
+                                <th style="width: 80px;">العميل</th>
+                                <th style="width: 80px;">المورد</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-set="global_counter" t-value="1"/>
+                            <t t-set="grand_total_profit" t-value="0.0"/>
+                            <t t-set="grand_total_cost" t-value="0.0"/>
+                            <t t-set="grand_total_sale" t-value="0.0"/>
+                            
+                            <t t-foreach="docs" t-as="doc">
+                                <t t-foreach="doc.order_line" t-as="order_line">
+                                    <t t-if="order_line.product_id">
+                                        <!-- Get corresponding purchase order line -->
+                                        <t t-set="po_line" t-value="None"/>
+                                        <t t-if="hasattr(doc, 'po_line_ids')">
+                                            <t t-foreach="doc.po_line_ids" t-as="po_line_item">
+                                                <t t-if="po_line_item.product_id.id == order_line.product_id.id">
+                                                    <t t-set="po_line" t-value="po_line_item"/>
+                                                </t>
+                                            </t>
+                                        </t>
+
+                                        <!-- Calculate values -->
+                                        <t t-set="cost_price" t-value="po_line.price_unit if po_line else order_line.product_id.standard_price"/>
+                                        <t t-set="sale_price" t-value="order_line.price_unit"/>
+                                        <t t-set="line_profit" t-value="(sale_price - cost_price) * order_line.product_uom_qty"/>
+                                        
+                                        <!-- Update grand totals -->
+                                        <t t-set="grand_total_cost" t-value="grand_total_cost + (cost_price * order_line.product_uom_qty)"/>
+                                        <t t-set="grand_total_sale" t-value="grand_total_sale + (sale_price * order_line.product_uom_qty)"/>
+                                        <t t-set="grand_total_profit" t-value="grand_total_profit + line_profit"/>
+
+                                        <tr>
+                                            <td t-esc="global_counter"/>
+                                            <td t-field="doc.name"/>
+                                            <td t-field="doc.date_order" t-options="{'widget': 'date'}"/>
+                                            <td t-esc="'%.2f' % order_line.product_uom_qty"/>
+                                            <td t-field="order_line.product_id.name" style="text-align: right;"/>
+                                            <td t-esc="dict(order_line.product_id._fields['type'].selection).get(order_line.product_id.type, '')"/>
+                                            <td class="currency-field" t-esc="'%.2f' % cost_price"/>
+                                            <td class="currency-field" t-esc="'%.2f' % sale_price"/>
+                                            <td t-att-class="'currency-field profit-positive' if line_profit >= 0 else 'currency-field profit-negative'" t-esc="'%.2f' % line_profit"/>
+                                            <td t-field="doc.partner_id.name"/>
+                                            <td t-field="doc.user_id.name"/>
+                                            <td t-field="po_line.partner_id.name" t-if="po_line"/>
+                                        </tr>
+                                        <t t-set="global_counter" t-value="global_counter + 1"/>
+                                    </t>
+                                </t>
+                            </t>
+                            
+                            <!-- Grand Total Row -->
+                            <tr style="background-color: #34495e; color: white; font-weight: bold;">
+                                <td colspan="6" style="text-align: center;">الإجمالي العام</td>
+                                <td class="currency-field" t-esc="'%.2f' % grand_total_cost"/>
+                                <td class="currency-field" t-esc="'%.2f' % grand_total_sale"/>
+                                <td t-att-class="'currency-field profit-positive' if grand_total_profit >= 0 else 'currency-field profit-negative'" t-esc="'%.2f' % grand_total_profit"/>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Report Footer -->
+                    <div style="margin-top: 30px; text-align: center; font-size: 12px; color: #7f8c8d;">
+                        <p>تم إنشاء هذا التقرير بواسطة نظام إدارة المبيعات</p>
+                        <p>عدد الطلبات: <t t-esc="len(docs)"/> | عدد البنود: <t t-esc="global_counter - 1"/></p>
+                        <p>الصفحة <span class="page"/> من <span class="topage"/></p>
+                    </div>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
